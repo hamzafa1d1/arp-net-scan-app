@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NetWatch — Network Manager</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <circle cx="14" cy="14" r="13" stroke="#6ee7b7" stroke-width="2"/>
+          <circle cx="14" cy="14" r="5" fill="#6ee7b7"/>
+          <line x1="14" y1="1" x2="14" y2="7" stroke="#6ee7b7" stroke-width="2"/>
+          <line x1="14" y1="21" x2="14" y2="27" stroke="#6ee7b7" stroke-width="2"/>
+          <line x1="1" y1="14" x2="7" y2="14" stroke="#6ee7b7" stroke-width="2"/>
+          <line x1="21" y1="14" x2="27" y2="14" stroke="#6ee7b7" stroke-width="2"/>
+        </svg>
+        <span>NetWatch</span>
+      </div>
+
+      <!-- Network info -->
+      <div class="net-info" id="net-info">
+        <div class="info-row"><span class="label">Interface</span><span id="s-iface">—</span></div>
+        <div class="info-row"><span class="label">Our IP</span><span id="s-ourip">—</span></div>
+        <div class="info-row"><span class="label">Gateway</span><span id="s-gw">—</span></div>
+        <div class="info-row"><span class="label">Network</span><span id="s-net">—</span></div>
+      </div>
+
+      <!-- Live device stats -->
+      <div class="device-stats">
+        <div class="stat-chip stat-online">
+          <span class="stat-num" id="stat-online">0</span>
+          <span class="stat-lbl">Online</span>
+        </div>
+        <div class="stat-chip stat-throttled">
+          <span class="stat-num" id="stat-throttled">0</span>
+          <span class="stat-lbl">Throttled</span>
+        </div>
+        <div class="stat-chip stat-blocked">
+          <span class="stat-num" id="stat-blocked">0</span>
+          <span class="stat-lbl">Blocked</span>
+        </div>
+      </div>
+
+      <!-- QoS Policy widget -->
+      <div class="qos-card" id="qos-card">
+        <div class="qos-header">
+          <div class="qos-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 20V10M12 20V4M6 20v-6"/>
+            </svg>
+            Default QoS
+          </div>
+          <label class="toggle" title="Enable/disable policy">
+            <input type="checkbox" id="policy-toggle" checked />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div id="qos-body">
+          <div class="qos-limits" id="qos-limits">
+            <div class="qos-limit-row">
+              <span class="qos-dir">↓ DL</span>
+              <span class="qos-val" id="qos-dl-val">2 Mbps</span>
+              <div class="qos-bar-wrap"><div class="qos-bar" id="qos-dl-bar" style="width:4%"></div></div>
+            </div>
+            <div class="qos-limit-row">
+              <span class="qos-dir">↑ UL</span>
+              <span class="qos-val" id="qos-ul-val">—</span>
+              <div class="qos-bar-wrap"><div class="qos-bar qos-bar-ul" id="qos-ul-bar" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <div class="qos-edit-row">
+            <button class="qos-edit-btn" id="qos-edit-btn">Edit limits</button>
+          </div>
+
+          <!-- Inline edit form (hidden by default) -->
+          <div class="qos-edit-form hidden" id="qos-edit-form">
+            <label class="qos-field">
+              <span>Download (kbps)</span>
+              <input type="number" id="qos-in-dl" min="0" placeholder="Unlimited" />
+            </label>
+            <label class="qos-field">
+              <span>Upload (kbps)</span>
+              <input type="number" id="qos-in-ul" min="0" placeholder="Unlimited" />
+            </label>
+            <div class="qos-presets">
+              <button class="qpre" data-dl="512"  data-ul="">512k</button>
+              <button class="qpre" data-dl="1024" data-ul="">1M</button>
+              <button class="qpre" data-dl="2048" data-ul="">2M</button>
+              <button class="qpre" data-dl="5120" data-ul="">5M</button>
+              <button class="qpre" data-dl="10240" data-ul="">10M</button>
+            </div>
+            <div class="qos-form-actions">
+              <button class="btn btn-primary btn-sm" id="qos-save-btn">Apply</button>
+              <button class="btn btn-ghost btn-sm" id="qos-cancel-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="qos-disabled-msg" class="qos-disabled-msg hidden">
+          Policy disabled — no automatic limits
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="btn btn-primary" id="btn-scan">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Scan Network
+        </button>
+      </div>
+
+      <nav class="views">
+        <button class="view-btn active" data-view="topology">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/>
+            <line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/>
+          </svg>
+          Topology
+        </button>
+        <button class="view-btn" data-view="table">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+          Device List
+        </button>
+      </nav>
+
+      <div class="legend">
+        <div class="legend-item"><span class="dot dot-online"></span>Online</div>
+        <div class="legend-item"><span class="dot dot-cut"></span>Blocked</div>
+        <div class="legend-item"><span class="dot dot-throttled"></span>Throttled</div>
+        <div class="legend-item"><span class="dot dot-gateway"></span>Gateway</div>
+        <div class="legend-item"><span class="dot dot-self"></span>This Device</div>
+      </div>
+
+      <div id="ws-status" class="ws-status disconnected">● Connecting…</div>
+    </aside>
+
+    <!-- Main content -->
+    <main id="main">
+      <!-- Topology View -->
+      <div id="view-topology" class="view active">
+        <div id="topology-container">
+          <svg id="topology-svg"></svg>
+          <div id="topo-empty" class="empty-state" style="display:none">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p>No devices found.<br>Click <strong>Scan Network</strong> to discover devices.</p>
+          </div>
+          <div class="topo-controls">
+            <button id="topo-fit" title="Fit to screen">⊡</button>
+            <button id="topo-zoom-in" title="Zoom in">+</button>
+            <button id="topo-zoom-out" title="Zoom out">−</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table View -->
+      <div id="view-table" class="view">
+        <div class="table-wrapper">
+          <div class="table-toolbar">
+            <input type="text" id="search-input" placeholder="Search by IP, hostname, vendor, MAC…"/>
+          </div>
+          <table id="device-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>IP Address</th>
+                <th>Hostname / Vendor</th>
+                <th>MAC Address</th>
+                <th>Download limit</th>
+                <th>Upload limit</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="device-tbody"></tbody>
+          </table>
+          <div id="table-empty" class="empty-state" style="display:none">
+            <p>No devices found. Click <strong>Scan Network</strong> to start.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Device Detail Panel -->
+    <div id="device-panel" class="device-panel hidden">
+      <button class="close-btn" id="panel-close">×</button>
+      <div class="panel-header">
+        <div class="panel-icon" id="panel-icon">?</div>
+        <div>
+          <div class="panel-hostname" id="panel-hostname">Unknown</div>
+          <div class="panel-ip" id="panel-ip">—</div>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <div class="detail-grid">
+          <div class="detail-item"><span class="label">MAC</span><span id="p-mac">—</span></div>
+          <div class="detail-item"><span class="label">Vendor</span><span id="p-vendor">—</span></div>
+          <div class="detail-item"><span class="label">Status</span><span id="p-status">—</span></div>
+        </div>
+
+        <!-- Bandwidth meters -->
+        <div class="panel-section" id="bw-meters-section">
+          <h3>Bandwidth Limits</h3>
+          <div class="bw-meter-group">
+            <div class="bw-meter-row">
+              <span class="bw-dir">↓ Download</span>
+              <span class="bw-limit-label" id="p-dl-label">Unlimited</span>
+            </div>
+            <div class="bw-meter-track">
+              <div class="bw-meter-fill bw-dl" id="p-dl-meter" style="width:0%"></div>
+            </div>
+            <div class="bw-meter-row">
+              <span class="bw-dir">↑ Upload</span>
+              <span class="bw-limit-label" id="p-ul-label">Unlimited</span>
+            </div>
+            <div class="bw-meter-track">
+              <div class="bw-meter-fill bw-ul" id="p-ul-meter" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>Network Control</h3>
+          <div class="control-row">
+            <button class="btn btn-danger" id="p-btn-cut">Block Device</button>
+            <button class="btn btn-success hidden" id="p-btn-restore">Restore Access</button>
+          </div>
+        </div>
+
+        <div class="panel-section" id="throttle-section">
+          <h3>Custom Throttle</h3>
+          <div class="throttle-form">
+            <label>
+              <span>Download Limit</span>
+              <div class="input-group">
+                <input type="number" id="p-dl" min="0" max="100000" placeholder="Unlimited" />
+                <span class="unit">kbps</span>
+              </div>
+              <input type="range" id="p-dl-slider" min="0" max="50000" step="100" value="0"/>
+              <div class="slider-labels">
+                <span>Unlimited</span><span id="p-dl-val">—</span><span>50 Mbps</span>
+              </div>
+            </label>
+            <label>
+              <span>Upload Limit</span>
+              <div class="input-group">
+                <input type="number" id="p-ul" min="0" max="100000" placeholder="Unlimited" />
+                <span class="unit">kbps</span>
+              </div>
+              <input type="range" id="p-ul-slider" min="0" max="50000" step="100" value="0"/>
+              <div class="slider-labels">
+                <span>Unlimited</span><span id="p-ul-val">—</span><span>50 Mbps</span>
+              </div>
+            </label>
+            <div class="throttle-presets">
+              <span>Presets:</span>
+              <button class="preset-btn" data-dl="256" data-ul="128">256/128 kbps</button>
+              <button class="preset-btn" data-dl="512" data-ul="256">512/256 kbps</button>
+              <button class="preset-btn" data-dl="1024" data-ul="512">1/0.5 Mbps</button>
+              <button class="preset-btn" data-dl="5120" data-ul="2048">5/2 Mbps</button>
+              <button class="preset-btn" data-dl="0" data-ul="0">Unlimited</button>
+            </div>
+            <button class="btn btn-primary" id="p-btn-throttle">Apply Limits</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Scan overlay -->
+    <div id="scan-overlay" class="hidden">
+      <div class="scan-spinner"></div>
+      <p>Scanning network…</p>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
